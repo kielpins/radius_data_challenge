@@ -1,3 +1,5 @@
+"""Main script for response to assignment"""
+
 import os, json, copy
 import pandas as pd
 import validate

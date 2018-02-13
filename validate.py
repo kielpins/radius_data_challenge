@@ -1,3 +1,5 @@
+"""Module for loading auxiliary data (GeoNames, NAICS) and defining validation functions"""
+
 import re
 import pandas as pd
 
