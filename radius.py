@@ -10,12 +10,14 @@ if reload_data:
         raw_data = json.load(fp)
 columns = ['name', 'address', 'city', 'state', 'zip', 'time_in_business', 'phone', 'category_code', 'headcount', 'revenue',] 
 data = pd.DataFrame.from_records(raw_data, columns=columns)
+
+# make `city` field upper-case for join to GeoNames data
 def make_upper(val):
     try:
         return val.upper()
     except AttributeError:
         return val
-data['city'] = data['city'].apply(make_upper) # comparison with GeoNames data should be case-independent
+data['city'] = data['city'].apply(make_upper)
 
 ## answer question 1
 print('Number of non-null records in each field:')
@@ -25,20 +27,18 @@ print(data.count(axis=0))
 # duplicate 'name' entries are invalid from the start, remove them all
 data_dedup = data.drop_duplicates('name', keep=False)
 data_is_valid = copy.deepcopy(data_dedup) # to be used for counting valid entries
-# count valid entries in city, state, zip fields
+# get valid entries in city, state, zip fields
 data_csz_good = pd.merge(data_dedup, validate.us_geonames)
-#cols_to_validate = columns
-cols_to_validate = ['name', 'address', 'phone', 'category_code', 'revenue',]
-for c in cols_to_validate:
+# validate remaining fields
+vk = list(validate.is_valid.keys())
+for c in vk:
     # note validation is actually performed by the functions in the validate module, called through the registry validate.is_valid    
     data_is_valid[c] = data_dedup[c].apply(validate.is_valid[c])
 print('Number of true-valued records:')
-print(data_is_valid[cols_to_validate].sum(axis=0).astype(int))
+print(data_is_valid[vk].sum(axis=0).astype(int))
 print('city/state/zip', len(data_csz_good))
 
 ## answer question 3
-print('Cardinality of')
-
-gn = copy.deepcopy(validate.us_geonames[['city', 'state', 'zip']])
-gn = gn.drop_duplicates(keep=False)
-gn['city'] = gn['city'].apply(lambda x: x.upper())
+print('Cardinality of each field')
+for c in data.columns:
+    print('{}\t{}'.format(c, len(data[c].unique())))

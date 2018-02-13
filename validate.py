@@ -8,6 +8,7 @@ us_geonames = pd.read_csv('US.txt', sep='\t', usecols=[1,2,3,4], names=col_names
 puerto_rico_geonames = pd.read_csv('PR.txt', sep='\t', usecols=[1,2,3,4], names=col_names)
 virgin_islands_geonames = pd.read_csv('VI.txt', sep='\t', usecols=[1,2,3,4], names=col_names)
 us_geonames = us_geonames.append(puerto_rico_geonames).append(virgin_islands_geonames)
+# format GeoNames data for direct join with Radius data
 us_geonames = us_geonames[['zip', 'city', 'state']]
 us_geonames['city'] = us_geonames['city'].apply(lambda x: x.upper())
 us_geonames['zip'] = us_geonames['zip'].apply(lambda x: str(x))
@@ -23,11 +24,25 @@ for c in category_codes:
         category_codes.remove(c)
 category_codes = set(category_codes)
 
+
+##############################
+
+## data validation functions begin here
+## all validation functions take individual values `val` from fields
+## functions `find_bad_$FIELD` return the invalid values, which is helpful for assessing the validation procedure
+## functions `is_valid_$FIELD` simply return whether the value is valid or not for final scoring
+
+## TODO: write a function closure to convert `find_bad_$FIELD` functions into `is_valid_$FIELD` functions
+
+##############################
+
 ## filter for valid names
 
+# invalid names found by examining the `name` data
 bad_names = ['none', 'null', ' ']
 
 def find_bad_name(val):
+    """Return bad values in the `name` field."""
     if pd.isnull(val):
         return None
     if type(val) is not str:
@@ -37,11 +52,12 @@ def find_bad_name(val):
     return None
 
 def is_valid_name(val):
+    """Return validity of a value in the `name` field."""
     if pd.isnull(val):
         return False
     if type(val) is not str:
         return False
-    if val.lower() in bad_names:
+    if val.lower() in bad_names: 
         return False
     return True
 
@@ -51,6 +67,7 @@ address_stemmer_string = '([0-9a-z ]*) ste'
 address_stemmer_re = re.compile(address_stemmer_string)
 
 def find_bad_address(val):
+    """Return bad values in the `address` field."""
     if pd.isnull(val):
        return None
     if type(val) is not str:
@@ -62,13 +79,14 @@ def find_bad_address(val):
     return None
 
 def is_valid_address(val):
+    """Return validity of a value in the `address` field."""
     if pd.isnull(val):
         return False
     if type(val) is not str:
         return False
     if len(val) < 1:
         return False
-    if not str.isnumeric(val[0]):
+    if not str.isnumeric(val[0]): # first character should be a number for US addresses
         return False
     return True
 
@@ -76,6 +94,7 @@ def is_valid_address(val):
 ## filter for valid time in business - this is an easy one
 
 def is_valid_time(val):
+    """Return bad values in the `time_in_business` field."""
     if pd.isnull(val):
         return False
     if type(val) is not str:
@@ -90,6 +109,7 @@ phone_regex_string = '\(*\s*([0-9]{3})\s*\)*\-*\s*\-*([0-9]{3})\s*\-*\s*([0-9]{4
 phone_re = re.compile(phone_regex_string)
 
 def find_bad_phone(val):
+    """Return bad values in the `phone` field."""
     if not pd.isnull(val):
         try:
             if not str.isnumeric(val):
@@ -102,6 +122,7 @@ def find_bad_phone(val):
         return None
 
 def is_valid_phone(val):
+    """Return validity of a value in the `phone` field."""
     if pd.isnull(val):
         return False
     if type(val) is int:
@@ -121,6 +142,7 @@ def is_valid_phone(val):
 ## filter for valid category code
 
 def find_bad_catcode(val):
+    """Return bad values in the `category_code` field."""
     if pd.isnull(val):
         return None
     val = str(val)
@@ -137,10 +159,11 @@ def find_bad_catcode(val):
     return None
 
 def is_valid_catcode(val):
+    """Return validity of a value in the `category_code` field."""
     if pd.isnull(val):
         return False
     val = str(val)[:6]
-    while True:
+    while True: # iteratively strip the last digit and re-check whether value is found in NAICS
         if val in category_codes:
             return True
         if len(val) < 3:
@@ -155,15 +178,16 @@ headcount_re = re.compile(headcount_regex_string)
 headcount_special_cases = ['over 1,000']
 
 def is_valid_headcount(val):
+    """Return bad values in the `headcount` field."""
     if pd.isnull(val):
         return False
     if type(val) is not str:
         return False
-    m = re.match(headcount_re, val)
+    m = re.match(headcount_re, val) # valid if regex matches
     if m is not None:
         return True
     else:
-        return val.lower() in headcount_special_cases
+        return val.lower() in headcount_special_cases # or if the value is in the special cases
     return False
 
 ## filter for valid revenue
@@ -173,6 +197,7 @@ revenue_re = re.compile(revenue_regex_string)
 revenue_special_cases = ['less than $500,000', 'over $1 billion', 'over $500 million']
 
 def find_bad_revenue(val):
+    """Return bad values in the `revenue` field."""
     if pd.isnull(val):
        return None
     if type(val) is str:
@@ -186,14 +211,15 @@ def find_bad_revenue(val):
         return val
 
 def is_valid_revenue(val):
+    """Return validity of a value in the `revenue` field."""
     if pd.isnull(val):
         return False
     if type(val) is str:
-        m = re.match(revenue_re, val.lower())
+        m = re.match(revenue_re, val.lower()) # valid if regex matches
         if m is not None:
             return True
         else:
-            for rsc in revenue_special_cases:
+            for rsc in revenue_special_cases: # or if the value is in the special cases
                 if val.lower() == rsc:
                     return True
             return False
@@ -204,9 +230,6 @@ def is_valid_revenue(val):
 is_valid = {
     'name': is_valid_name,
     'address': is_valid_address,
-    'city': is_valid_city,
-    'state': is_valid_state,
-    'zip': is_valid_zip,    
     'phone': is_valid_phone,
     'time_in_business': is_valid_time,
     'category_code': is_valid_catcode,
