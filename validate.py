@@ -3,11 +3,14 @@ import pandas as pd
 
 # load US geographical data, sourced from GeoNames.org
 # Puerto Rico and Virgin Islands are referenced in data, make sure these are appended
-col_names = ['zip', 'city', 'state', 'state_abbrev']
+col_names = ['zip', 'city', 'state_fullname', 'state']
 us_geonames = pd.read_csv('US.txt', sep='\t', usecols=[1,2,3,4], names=col_names)
 puerto_rico_geonames = pd.read_csv('PR.txt', sep='\t', usecols=[1,2,3,4], names=col_names)
 virgin_islands_geonames = pd.read_csv('VI.txt', sep='\t', usecols=[1,2,3,4], names=col_names)
 us_geonames = us_geonames.append(puerto_rico_geonames).append(virgin_islands_geonames)
+us_geonames = us_geonames[['zip', 'city', 'state']]
+us_geonames['city'] = us_geonames['city'].apply(lambda x: x.upper())
+us_geonames['zip'] = us_geonames['zip'].apply(lambda x: str(x))
 
 # load NACIS category code values
 category_codes = pd.read_csv('NAICS_codes_2-6.csv', usecols=[1], names=['code'], skiprows=2, dtype=str).values.flatten().tolist()
@@ -69,73 +72,6 @@ def is_valid_address(val):
         return False
     return True
 
-## filter for valid cities
-    
-cityvals = set(list(map(lambda x: x.lower(), us_geonames['city'].values)))
-
-def find_bad_city(val):
-    if pd.isnull(val):
-        return None
-    if type(val) is not str:
-        return val
-    if val.lower() not in cityvals:
-        return val
-    return None
-
-def is_valid_city(val):
-    if pd.isnull(val):
-        return False
-    if type(val) is not str:
-        return False
-    if val.lower() not in cityvals:
-        return False
-    return True
-
-## filter for valid states
-    
-statevals = set(us_geonames['state_abbrev'].values)
-
-def find_bad_state(val):
-    if pd.isnull(val):
-        return None
-    if type(val) is not str:
-        return val
-    if val not in statevals:
-        return val
-    return None
-
-def is_valid_state(val):
-    if pd.isnull(val):
-        return False
-    if type(val) is not str:
-        return False
-    if val not in statevals:
-        return False
-    return True
-
-## filter for valid zip codes
-    
-zipvals = set(us_geonames['zip'].astype(int).values)
-
-def find_bad_zip(val):
-    if pd.isnull(val):
-        return None
-    if type(val) is int:
-        val = str(val)
-    if str.isnumeric(val) and len(val) != 5:
-        return val
-    return None
-        
-def is_valid_zip(val):
-    if pd.isnull(val):
-        return False
-    if type(val) is int:
-        val = str(val)
-    if str.isnumeric(val) and len(val) == 5:
-        if int(val) in zipvals:
-            return True
-    else:
-        return False
 
 ## filter for valid time in business - this is an easy one
 
